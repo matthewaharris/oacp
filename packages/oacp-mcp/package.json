@@ -31,12 +31,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/matthewaharris/agora.git",
+    "url": "git+https://github.com/matthewaharris/oacp.git",
     "directory": "packages/oacp-mcp"
   },
   "homepage": "https://liteneen.net",
   "bugs": {
-    "url": "https://github.com/matthewaharris/agora/issues"
+    "url": "https://github.com/matthewaharris/oacp/issues"
   },
   "author": "matthewaharris",
   "files": [

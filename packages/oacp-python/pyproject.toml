@@ -27,8 +27,8 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://liteneen.net"
-Documentation = "https://github.com/matthewaharris/agora/blob/main/docs/getting-started.md"
-Repository = "https://github.com/matthewaharris/agora"
+Documentation = "https://github.com/matthewaharris/oacp/blob/main/docs/getting-started.md"
+Repository = "https://github.com/matthewaharris/oacp"
 Dashboard = "https://dashboard.liteneen.net"
 
 [tool.hatch.build.targets.wheel]

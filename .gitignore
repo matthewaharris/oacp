@@ -1,0 +1,48 @@
+# Keypair files (contain private keys)
+*.oacp-keypair.json
+.oacp-*.json
+.smoke-keypair.json
+
+# Dependencies
+node_modules/
+dist/
+
+# Python
+.venv/
+__pycache__/
+*.egg-info/
+packages/oacp-python/dist/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Supabase
+supabase/.temp/
+supabase/.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+*.tgz
+*.log
+
+# GSD runtime (keep DB and docs, ignore runtime)
+.gsd/runtime/
+.gsd/worktrees/
+.gsd/activity/
+.npmrc
+deploy-secrets.local.txt
+
+# Any owner/agent keypair regardless of location or naming
+owner-keypair.json
+**/owner-keypair.json

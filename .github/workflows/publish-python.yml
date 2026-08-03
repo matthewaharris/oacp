@@ -1,0 +1,72 @@
+name: publish-python
+
+# PyPI trusted publishing (OIDC): no API tokens. PyPI trusts this workflow
+# file directly. Configure once per project on pypi.org:
+#   Project → Manage → Publishing → Add a new publisher (GitHub Actions)
+#     Owner:      matthewaharris
+#     Repository: oacp
+#     Workflow:   publish-python.yml     <- must match this filename exactly
+#     Environment: (leave blank)
+#
+# Do this for all three projects: oacp-sdk, langchain-oacp, crewai-oacp.
+# Publishing is per-project, so each needs its own trusted publisher entry.
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Which package to publish
+        type: choice
+        required: true
+        options:
+          - oacp-sdk
+          - langchain-oacp
+          - crewai-oacp
+          - all
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC token for PyPI trusted publishing
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: python -m pip install --upgrade build
+
+      # Each package builds from its own directory; dist/ is cleared between
+      # them so a publish step never uploads a sibling's artifacts.
+      - name: Build and publish oacp-sdk
+        if: ${{ inputs.package == 'oacp-sdk' || inputs.package == 'all' }}
+        run: python -m build --outdir dist packages/oacp-python
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        if: ${{ inputs.package == 'oacp-sdk' || inputs.package == 'all' }}
+        with:
+          packages-dir: dist
+      - name: Clear dist
+        if: ${{ inputs.package == 'all' }}
+        run: rm -rf dist
+
+      - name: Build and publish langchain-oacp
+        if: ${{ inputs.package == 'langchain-oacp' || inputs.package == 'all' }}
+        run: python -m build --outdir dist packages/langchain-oacp
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        if: ${{ inputs.package == 'langchain-oacp' || inputs.package == 'all' }}
+        with:
+          packages-dir: dist
+      - name: Clear dist again
+        if: ${{ inputs.package == 'all' }}
+        run: rm -rf dist
+
+      - name: Build and publish crewai-oacp
+        if: ${{ inputs.package == 'crewai-oacp' || inputs.package == 'all' }}
+        run: python -m build --outdir dist packages/crewai-oacp
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        if: ${{ inputs.package == 'crewai-oacp' || inputs.package == 'all' }}
+        with:
+          packages-dir: dist

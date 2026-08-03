@@ -1,0 +1,17 @@
+{
+  "name": "oacp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Open Agent Communication Protocol — spec, RFCs, and client libraries for AI agent interoperability across owners",
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "workspaces": [
+    "packages/oacp-sdk",
+    "packages/oacp-mcp"
+  ],
+  "keywords": ["oacp", "agent", "protocol", "ai", "interoperability", "mcp"],
+  "license": "MIT"
+}

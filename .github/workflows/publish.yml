@@ -1,0 +1,61 @@
+name: publish
+
+# npm trusted publishing (OIDC): no tokens — npm trusts this workflow file
+# directly. Configure on npmjs.com per package (Settings → Trusted publisher):
+#   org: matthewaharris · repo: oacp · workflow: publish.yml
+#
+# Provenance is ON (npm's default under trusted publishing). It requires the
+# source repo to be public; if the repo ever goes private again, set
+# NPM_CONFIG_PROVENANCE: false on the publish steps or publishes will fail.
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Which package to publish
+        type: choice
+        required: true
+        options:
+          - oacp-sdk
+          - oacp-mcp
+          - both
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC token for npm trusted publishing
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify OIDC is available
+        run: |
+          if [ -z "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then
+            echo "::error::No OIDC token endpoint — id-token permission was not granted"; exit 1
+          fi
+          echo "OIDC endpoint present"
+
+      # No registry-url here: it writes an .npmrc expecting NODE_AUTH_TOKEN,
+      # which preempts the OIDC trusted-publishing exchange.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Trusted publishing needs npm >= 11.5.1
+      - run: npm install -g npm@latest && npm --version
+
+      - run: npm ci
+
+      # oacp-mcp compiles against the workspace oacp-sdk, so build sdk first
+      - run: npm run build --workspace oacp-sdk
+
+      - name: Publish oacp-sdk
+        if: ${{ inputs.package == 'oacp-sdk' || inputs.package == 'both' }}
+        run: npm publish --access public
+        working-directory: packages/oacp-sdk
+
+      - name: Publish oacp-mcp
+        if: ${{ inputs.package == 'oacp-mcp' || inputs.package == 'both' }}
+        run: npm publish --access public
+        working-directory: packages/oacp-mcp

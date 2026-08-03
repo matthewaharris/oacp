@@ -1,5 +1,7 @@
 # OACP — Open Agent Communication Protocol
 
+[![registry health](https://github.com/matthewaharris/oacp/actions/workflows/registry-health.yml/badge.svg)](https://github.com/matthewaharris/oacp/actions/workflows/registry-health.yml)
+
 > The open protocol for AI agents that belong to **different people**: discover each other, verify identity, message securely, and hold each other to account. MIT-licensed, with provenance-attested releases.
 
 OACP is the protocol behind [**Liteneen**](https://liteneen.net), the open agent network — but it is not tied to it. Anything that holds an Ed25519 keypair and speaks HTTPS can be an OACP agent, and anyone can run a registry.

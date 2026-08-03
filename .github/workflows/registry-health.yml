@@ -1,0 +1,81 @@
+name: registry-health
+
+# External dead-man monitor for the reference registry (Liteneen).
+# Runs OUTSIDE the registry's own infrastructure on purpose: a monitor
+# hosted on the platform it watches goes down with it and pages no one.
+#
+# Checks three distinct failure modes:
+#   1. the API answers at all (/health reachable, status ok)
+#   2. the background sweep is actually running (sweep_age_seconds fresh) —
+#      offline detection and the TTL/burn reapers ride on it, and it has
+#      failed silently before
+#   3. a real read path works (/discover returns 200)
+#
+# Alerts go to the operator's Telegram. Secrets: TELEGRAM_BOT_TOKEN,
+# TELEGRAM_ALERT_CHAT_ID. GitHub cron is best-effort (runs may land
+# minutes late); the sweep-freshness threshold accounts for that.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+    inputs:
+      test_alert:
+        description: Send a test Telegram alert to verify the paging path
+        type: boolean
+        default: false
+
+concurrency:
+  group: registry-health
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check registry health
+        id: health
+        run: |
+          set +e
+          FAILURES=""
+          BASE="https://zhenbunwugeskqtghjyt.supabase.co/functions/v1/oacp"
+
+          HEALTH=$(curl -sS --max-time 15 "$BASE/health")
+          if [ $? -ne 0 ]; then
+            FAILURES="/health unreachable"
+          else
+            STATUS=$(echo "$HEALTH" | jq -r '.status // "missing"')
+            SWEEP_AGE=$(echo "$HEALTH" | jq -r '.sweep_age_seconds // "null"')
+            [ "$STATUS" != "ok" ] && FAILURES="$FAILURES; /health status=$STATUS"
+            if [ "$SWEEP_AGE" = "null" ]; then
+              FAILURES="$FAILURES; sweep has never stamped (background jobs not running)"
+            elif [ "$SWEEP_AGE" -gt 300 ]; then
+              FAILURES="$FAILURES; sweep stale (${SWEEP_AGE}s — offline detection and reapers are NOT running)"
+            fi
+          fi
+
+          DISCOVER_CODE=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 15 "$BASE/discover?limit=1")
+          [ "$DISCOVER_CODE" != "200" ] && FAILURES="$FAILURES; /discover returned $DISCOVER_CODE"
+
+          FAILURES="${FAILURES#; }"
+          echo "failures=$FAILURES" >> "$GITHUB_OUTPUT"
+          if [ -n "$FAILURES" ]; then
+            echo "::error::Registry health check failed: $FAILURES"
+            exit 1
+          fi
+          echo "Registry healthy (sweep age ${SWEEP_AGE}s)"
+
+      - name: Send test alert
+        if: ${{ inputs.test_alert == true }}
+        run: |
+          curl -sS -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H 'Content-Type: application/json' \
+            -d "{\"chat_id\": \"${{ secrets.TELEGRAM_ALERT_CHAT_ID }}\", \"text\": \"🟢 OACP registry-health: test alert — the external paging path works.\"}" > /dev/null
+          echo "Test alert sent"
+
+      - name: Page the operator
+        if: ${{ failure() }}
+        run: |
+          curl -sS -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -H 'Content-Type: application/json' \
+            -d "{\"chat_id\": \"${{ secrets.TELEGRAM_ALERT_CHAT_ID }}\", \"text\": \"🔴 OACP registry-health FAILED: ${{ steps.health.outputs.failures || 'health step did not report' }} — https://github.com/matthewaharris/oacp/actions\"}" > /dev/null

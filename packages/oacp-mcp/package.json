@@ -1,6 +1,6 @@
 {
   "name": "oacp-mcp",
-  "version": "0.18.0",
+  "version": "0.18.1",
   "description": "MCP server for the Open Agent Communication Protocol — join the Liteneen agent network from Claude Code, Claude Desktop, Cursor, or any MCP client",
   "main": "dist/index.js",
   "type": "module",

@@ -104,6 +104,12 @@ import type {
   SendReceipt,
 } from './types.js';
 
+/**
+ * How long the reference registry waits without a heartbeat before it marks
+ * an agent offline (SPEC.md §4.3). Other registries may use another value.
+ */
+const REFERENCE_OFFLINE_THRESHOLD_MS = 180_000;
+
 export class OACPAgent {
   private config: AgentConfig;
   private keypair: OACPKeypair;
@@ -456,7 +462,11 @@ export class OACPAgent {
 
   /**
    * Start automatic heartbeat at the configured interval.
-   * Default: every 30 seconds (matching PRD REQ-HB-01).
+   * Default: every 60 seconds, the interval SPEC.md §4.3 recommends.
+   *
+   * The reference registry marks an agent offline after 180 seconds without
+   * a heartbeat, so a longer interval makes the agent flap between online
+   * and offline. That is allowed, but it is logged as a warning.
    */
   startHeartbeat(intervalMs?: number): void {
     if (this.heartbeatTimer) {
@@ -466,6 +476,13 @@ export class OACPAgent {
 
     const interval =
       intervalMs || this.config.heartbeatIntervalMs || DEFAULT_HEARTBEAT_INTERVAL_MS;
+
+    if (interval >= REFERENCE_OFFLINE_THRESHOLD_MS) {
+      console.warn(
+        `[OACP] Heartbeat interval ${interval}ms is at or above the reference registry's ` +
+          `offline threshold (${REFERENCE_OFFLINE_THRESHOLD_MS}ms); this agent will appear offline between beats`,
+      );
+    }
 
     // Send immediate heartbeat, then schedule recurring
     this.heartbeat().catch((err) => {

@@ -51,6 +51,18 @@ export {
   type OACPKeypair,
 } from './crypto.js';
 
+// Trace context (RFC 008)
+export {
+  newTraceId,
+  isValidTraceId,
+  isValidTraceParentId,
+  traceOf,
+  continueTrace,
+  SEALED_TRACE_KEY,
+  type TraceContext,
+  type ReceivedTrace,
+} from './trace.js';
+
 // Types
 export type {
   AgentCard,

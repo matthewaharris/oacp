@@ -41,6 +41,13 @@ import {
   type SealReader,
 } from './seal.js';
 import {
+  SEALED_TRACE_KEY,
+  isValidTraceId,
+  isValidTraceParentId,
+  traceOf,
+  type TraceContext,
+} from './trace.js';
+import {
   validatePayload,
   isSenderAllowed,
   matchAction,
@@ -699,6 +706,14 @@ export class OACPAgent {
        * ciphertext. Structured assertions are what reputation scores.
        */
       assertions?: Assertion[];
+      /**
+       * RFC 008: the trace this message belongs to. Carried in the signed
+       * cleartext envelope by default, so the registry and both owners can
+       * follow a request across agents. `sealed: true` carries it inside the
+       * sealed payload instead (the message itself must be sealed), hiding it
+       * from the registry and observers.
+       */
+      trace?: TraceContext & { sealed?: boolean };
     },
   ): Promise<string> {
     if (!this.agentId || !this.registryToken) {
@@ -717,6 +732,33 @@ export class OACPAgent {
 
     // RFC 004: private-by-default — seal to friends unless told otherwise.
     const shouldSeal = options?.seal ?? this.isFriend(recipientId);
+
+    // RFC 008: validate before anything is signed or sent. A sealed trace
+    // joins the payload here so it is encrypted with it below.
+    const trace = options?.trace;
+    if (trace) {
+      if (!isValidTraceId(trace.traceId)) {
+        throw new Error('[OACP] trace.traceId must be 32 lowercase hex characters, not all zeros');
+      }
+      if (trace.parentId !== undefined && !isValidTraceParentId(trace.parentId)) {
+        throw new Error('[OACP] trace.parentId must be 1 to 64 characters of A-Z a-z 0-9 _ -');
+      }
+      if (trace.sealed) {
+        if (!shouldSeal) {
+          throw new Error(
+            '[OACP] trace.sealed needs a sealed message: an unsealed payload would carry the trace in the clear',
+          );
+        }
+        payload = {
+          ...payload,
+          [SEALED_TRACE_KEY]: {
+            trace_id: trace.traceId,
+            ...(trace.parentId ? { parent_id: trace.parentId } : {}),
+          },
+        };
+      }
+    }
+    const envelopeTrace = trace && !trace.sealed ? trace : undefined;
 
     if (shouldSeal) {
       const recipientCard = await this.getAgentCard(recipientId);
@@ -762,6 +804,8 @@ export class OACPAgent {
       payload,
       correlation_id: correlationId,
       sequence: sequence,
+      trace_id: envelopeTrace?.traceId,
+      trace_parent_id: envelopeTrace?.parentId,
     });
 
     const signature = signMessage(canonical, this.keypair.secretKey);
@@ -776,6 +820,10 @@ export class OACPAgent {
 
     if (correlationId) body.correlation_id = correlationId;
     if (sequence !== undefined) body.sequence = sequence;
+    if (envelopeTrace) {
+      body.trace_id = envelopeTrace.traceId;
+      if (envelopeTrace.parentId) body.trace_parent_id = envelopeTrace.parentId;
+    }
     if (options?.visibility) body.visibility = options.visibility;
     if (options?.publicSummary !== undefined) body.public_summary = options.publicSummary;
     if (options?.ttlSeconds !== undefined) body.ttl_seconds = options.ttlSeconds;
@@ -792,7 +840,12 @@ export class OACPAgent {
 
     if (!response.ok) {
       const error = (await response.json()) as ApiError;
-      throw new Error(`Send failed (${response.status}): ${error.error}`);
+      // A registry that predates RFC 008 verifies the signature without the
+      // trace fields, so a traced message fails there as a bad signature.
+      const hint = envelopeTrace && response.status === 403 && /signature/i.test(String(error.error))
+        ? ' (this message carried a trace ID: the registry may not support RFC 008 trace context yet)'
+        : '';
+      throw new Error(`Send failed (${response.status}): ${error.error}${hint}`);
     }
 
     // deno-lint-ignore no-explicit-any
@@ -865,6 +918,8 @@ export class OACPAgent {
       burnAfterRead?: boolean;
       /** RFC 007 §2: labeled claims (see send()). */
       assertions?: Assertion[];
+      /** RFC 008: trace context (see send()). */
+      trace?: TraceContext & { sealed?: boolean };
     },
   ): Promise<SendReceipt> {
     await this.send(recipientId, messageType, payload, options);
@@ -1745,6 +1800,7 @@ export class OACPAgent {
       if (result && typeof result === 'object') {
         const resultMsgId = await this.send(senderId, 'task_result', result, {
           correlationId: msg.correlation_id,
+          trace: this.replyTrace(msg),
         });
 
         // Credit this agent for the work done (proof-of-work)
@@ -1785,8 +1841,20 @@ export class OACPAgent {
         error: 'execution_error',
         message: errorMsg,
         action: action.name,
-      }, { correlationId: msg.correlation_id });
+      }, { correlationId: msg.correlation_id, trace: this.replyTrace(msg) });
     }
+  }
+
+  /**
+   * RFC 008 §4: a reply stays in the trace of the request it answers. A trace
+   * that arrived sealed is never repeated in the clear: if the reply will not
+   * be sealed, the trace is dropped instead.
+   */
+  private replyTrace(msg: MessageEnvelope): (TraceContext & { sealed?: boolean }) | undefined {
+    const received = traceOf(msg);
+    if (!received) return undefined;
+    if (received.sealed && !this.isFriend(msg.sender_agent_id)) return undefined;
+    return { traceId: received.traceId, sealed: received.sealed };
   }
 
   /**

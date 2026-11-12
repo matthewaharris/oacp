@@ -72,6 +72,9 @@ export function generateKeypair(): OACPKeypair {
  * This MUST match the Edge Function's canonicalizeMessage exactly.
  *
  * Canonical format: JSON.stringify with alphabetically sorted keys (excluding signature).
+ *
+ * trace_id and trace_parent_id (RFC 008) are signed when present and omitted
+ * when absent, so a message without them canonicalizes exactly as before.
  */
 export function canonicalizeMessage(fields: {
   sender_agent_id: string;
@@ -81,6 +84,8 @@ export function canonicalizeMessage(fields: {
   correlation_id?: string;
   sequence?: number;
   timestamp?: string;
+  trace_id?: string;
+  trace_parent_id?: string;
 }): string {
   const canonical: Record<string, unknown> = {};
   if (fields.correlation_id !== undefined) canonical.correlation_id = fields.correlation_id;
@@ -90,6 +95,8 @@ export function canonicalizeMessage(fields: {
   canonical.sender_agent_id = fields.sender_agent_id;
   if (fields.sequence !== undefined) canonical.sequence = fields.sequence;
   if (fields.timestamp !== undefined) canonical.timestamp = fields.timestamp;
+  if (fields.trace_id !== undefined) canonical.trace_id = fields.trace_id;
+  if (fields.trace_parent_id !== undefined) canonical.trace_parent_id = fields.trace_parent_id;
 
   return JSON.stringify(canonical);
 }

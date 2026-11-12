@@ -149,6 +149,10 @@ export interface MessageEnvelope {
   timestamp: string;
   correlation_id?: string;
   sequence?: number;
+  /** RFC 008: the originating request this message belongs to (32 hex). Signed. */
+  trace_id?: string;
+  /** RFC 008: the sender's unit of work that caused this message. Signed. */
+  trace_parent_id?: string;
   /** Set by the SDK when a sealed payload (RFC 001 §4) was decrypted locally */
   was_sealed?: boolean;
   /**

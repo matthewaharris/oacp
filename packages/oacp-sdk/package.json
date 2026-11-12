@@ -9,7 +9,7 @@
     "build": "tsc",
     "lint": "tsc --noEmit",
     "prepublishOnly": "npm run build",
-    "test": "echo \"Tests pending\" && exit 0"
+    "test": "tsc && node --test test/trace.test.mjs"
   },
   "keywords": [
     "oacp",

@@ -50,6 +50,9 @@ jobs:
       # oacp-mcp compiles against the workspace oacp-sdk, so build sdk first
       - run: npm run build --workspace oacp-sdk
 
+      # A release that fails its own tests must not reach npm
+      - run: npm test --workspace oacp-sdk
+
       - name: Publish oacp-sdk
         if: ${{ inputs.package == 'oacp-sdk' || inputs.package == 'both' }}
         run: npm publish --access public

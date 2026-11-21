@@ -1865,22 +1865,25 @@ export class OACPAgent {
     // Fire handlers at most once per message, whichever route delivered it
     // (push channel or poll). Bounded so long-lived agents don't grow it
     // without limit.
-    if (msg.message_id) {
-      if (this.dispatchedMessageIds.has(msg.message_id)) return;
-      this.dispatchedMessageIds.add(msg.message_id);
-      if (this.dispatchedMessageIds.size > 1000) {
-        const oldest = this.dispatchedMessageIds.values().next().value;
-        if (oldest) this.dispatchedMessageIds.delete(oldest);
-      }
-    }
+    if (msg.message_id && this.dispatchedMessageIds.has(msg.message_id)) return;
 
     // RFC 005: quarantined rows are payload-withheld first contact — the
     // REST inbox presents them redacted; never hand a raw one to handlers.
+    // A held message is not recorded as dispatched: it has to reach the
+    // handlers once the sender is accepted and the registry releases it.
     if (msg.delivery_status === 'quarantined') {
       console.log(
         `[OACP] Quarantined first-contact message from ${msg.sender_agent_id?.substring(0, 8)}... — held until the sender is accepted (acceptSender)`,
       );
       return;
+    }
+
+    if (msg.message_id) {
+      this.dispatchedMessageIds.add(msg.message_id);
+      if (this.dispatchedMessageIds.size > 1000) {
+        const oldest = this.dispatchedMessageIds.values().next().value;
+        if (oldest) this.dispatchedMessageIds.delete(oldest);
+      }
     }
 
     console.log(
@@ -2238,14 +2241,59 @@ export class OACPAgent {
   /**
    * Accept a non-friend sender (RFC 005 §3). Releases every quarantined
    * message held from them and lets future sends deliver immediately.
+   *
+   * Released messages are handed to this agent's handlers before the call
+   * returns. The registry pushes a message once, when it arrives; a message
+   * that arrived held would otherwise never be acted on.
    */
   async acceptSender(
     senderAgentId: string,
   ): Promise<{ sender_agent_id: string; sender_name: string; status: string; released_messages: number }> {
-    return this.apiPost('/contacts/set', {
+    const held = await this.heldMessageIdsFrom(senderAgentId);
+    const result = await this.apiPost('/contacts/set', {
       sender_agent_id: senderAgentId,
       status: 'accepted',
     });
+    if (result.released_messages > 0 && held.length > 0) {
+      await this.dispatchReleased(held);
+    }
+    return result;
+  }
+
+  /** IDs of the messages the registry is holding from one sender. */
+  private async heldMessageIdsFrom(senderAgentId: string): Promise<string[]> {
+    try {
+      const res = await this.getMessages({ direction: 'inbox', limit: 100 });
+      return res.messages
+        .filter((m) => m.sender_agent_id === senderAgentId && m.delivery_status === 'quarantined')
+        .map((m) => m.message_id)
+        .filter((id): id is string => !!id);
+    } catch (err) {
+      // Never block the accept itself on this lookup.
+      console.warn(
+        `[OACP] Could not list held messages from ${senderAgentId}: ${err instanceof Error ? err.message : err}`,
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Fetch messages the registry has just released and dispatch them, oldest
+   * first. A message still shown as held is skipped by dispatchMessage.
+   */
+  private async dispatchReleased(messageIds: string[]): Promise<void> {
+    try {
+      const wanted = new Set(messageIds);
+      const res = await this.getMessages({ direction: 'inbox', limit: 100 });
+      const released = res.messages
+        .filter((m) => m.message_id && wanted.has(m.message_id))
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      for (const msg of released) this.dispatchMessage(msg);
+    } catch (err) {
+      console.warn(
+        `[OACP] Could not fetch released messages: ${err instanceof Error ? err.message : err}`,
+      );
+    }
   }
 
   /**

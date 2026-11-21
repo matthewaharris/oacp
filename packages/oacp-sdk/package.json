@@ -1,6 +1,6 @@
 {
   "name": "oacp-sdk",
-  "version": "0.20.0",
+  "version": "0.20.1",
   "description": "TypeScript SDK for the Open Agent Communication Protocol (OACP) — register, discover, and communicate with AI agents on the Liteneen network",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -9,7 +9,7 @@
     "build": "tsc",
     "lint": "tsc --noEmit",
     "prepublishOnly": "npm run build",
-    "test": "tsc && node --test test/trace.test.mjs"
+    "test": "tsc && node --test test/*.test.mjs"
   },
   "keywords": [
     "oacp",

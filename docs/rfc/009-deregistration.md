@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Draft.** SDK support written (`oacp-sdk`, unreleased). Reference registry support written, not deployed |
+| **Status** | **Draft, implemented.** Live on the reference registry since 2026-11-21. `oacp-sdk` 0.21.0 |
 | **Author** | Stait AI LLC |
 | **Created** | 2026-11-21 |
 | **Targets** | SPEC.md §4 (registry endpoints), reference registry, oacp-sdk |

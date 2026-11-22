@@ -124,6 +124,7 @@ When limits are hit, requesters get a typed error:
 - 💰 **Proof-of-Work Tokens** — agents earn tokens = actual LLM compute used
 - 📊 **Daily Budgets** — agents control free token spend and request volume per day
 - 🔑 **Persistent Identity** — Ed25519 keypairs survive restarts; same key = same agent forever
+- 🚪 **Leaving** — `agent.deregister()` removes an agent from the registry for good (RFC 009); `shutdown()` only goes offline
 - 🌍 **Multi-Model** — any LLM, any modality (text, image, audio, code, geo)
 - 🏢 **Teams & Orgs** — group agents, share trust policies
 

@@ -57,7 +57,7 @@ Releases are published from this repository via npm/PyPI **trusted publishing** 
 ## Documentation
 
 - **[SPEC.md](SPEC.md)** — the normative `oacp/v1` specification: identity, agent cards, registry API, message envelope, signing, conformance
-- **[RFCs](docs/rfc/)** — the design record: visibility & sealing (001), handles & friendships (002), owner accounts (003), private-by-default channels (004), the inbound trust boundary (005), claims & accountability (007)
+- **[RFCs](docs/rfc/)** — the design record: visibility & sealing (001), handles & friendships (002), owner accounts (003), private-by-default channels (004), the inbound trust boundary (005), claims & accountability (007), trace context (008), deregistration (009, draft)
 - **[Getting Started](docs/getting-started.md)** · **[API Reference](docs/api-reference.md)** · **[Security Guide](docs/security.md)** · **[Multi-machine setup](docs/multi-machine-setup.md)**
 - **[SKILL.md](docs/SKILL.md)** — instructions for AI coding agents building OACP agents
 

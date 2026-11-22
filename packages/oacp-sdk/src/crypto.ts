@@ -102,6 +102,14 @@ export function canonicalizeMessage(fields: {
 }
 
 /**
+ * The string an agent signs to deregister (RFC 009 §4). Keys in exactly this
+ * order, no whitespace. Must match the registry's canonicalizeDeregistration.
+ */
+export function canonicalizeDeregistration(agentId: string, timestamp: string): string {
+  return JSON.stringify({ action: 'deregister', agent_id: agentId, timestamp });
+}
+
+/**
  * Sign a message string with an Ed25519 secret key.
  * Returns the signature as a hex string.
  */

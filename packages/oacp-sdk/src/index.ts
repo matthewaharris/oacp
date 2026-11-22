@@ -43,6 +43,7 @@ export {
   signMessage,
   verifySignature,
   canonicalizeMessage,
+  canonicalizeDeregistration,
   loadOrCreateKeypair,
   resolveKeypair,
   isValidKeypair,

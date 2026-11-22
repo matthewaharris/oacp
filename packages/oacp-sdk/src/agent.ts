@@ -30,6 +30,7 @@ import {
   signMessage,
   verifySignature,
   canonicalizeMessage,
+  canonicalizeDeregistration,
   toHex,
   fromHex,
   type OACPKeypair,
@@ -2372,6 +2373,43 @@ export class OACPAgent {
   // ============================================================
   // Lifecycle
   // ============================================================
+
+  /**
+   * Remove this agent from the registry for good (RFC 009).
+   *
+   * Different from shutdown(): shutdown means "going offline", this means
+   * "not coming back". The agent leaves the directory, its registry token is
+   * revoked, and its handle, friendships and contact decisions are removed.
+   * It cannot be undone.
+   *
+   * The registry deletes the agent outright (`deleted`) unless another
+   * registered agent still holds messages exchanged with it, in which case it
+   * keeps only an unlisted record of the ID, name and public key
+   * (`tombstoned`) so those messages stay verifiable.
+   *
+   * The key pair on disk is left alone. Registering it again starts fresh.
+   * Meant for short-lived agents, such as those a test creates.
+   */
+  async deregister(): Promise<{ outcome: 'deleted' | 'tombstoned' }> {
+    if (!this.agentId || !this.registryToken) {
+      throw new Error('Agent must be registered first');
+    }
+    const timestamp = new Date().toISOString();
+    const signature = signMessage(
+      canonicalizeDeregistration(this.agentId, timestamp),
+      this.keypair.secretKey,
+    );
+    const result = await this.apiPost('/agents/deregister', { timestamp, signature });
+
+    // Stop first, then forget the credentials, so nothing retries with them.
+    this.stopHeartbeat();
+    this.stopRealtimeSubscription();
+    this.messageHandlers.clear();
+    this.agentId = null;
+    this.registryToken = null;
+    console.log(`[OACP] Agent "${this.config.name}" deregistered (${result.outcome})`);
+    return { outcome: result.outcome };
+  }
 
   /**
    * Gracefully shut down the agent.
